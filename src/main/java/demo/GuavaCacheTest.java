@@ -25,8 +25,10 @@ import java.util.concurrent.TimeUnit;
 
 public class GuavaCacheTest {
 
-    public final LoadingCache<String, Integer> loadingCache = CacheBuilder.newBuilder().refreshAfterWrite(2, TimeUnit.MINUTES)
-            .build(new KilimCacheLoader());
+    public final LoadingCache<String, Integer> loadingCache =
+            CacheBuilder.newBuilder()
+                    .refreshAfterWrite(2, TimeUnit.MINUTES)
+                    .build(new KilimCacheLoader());
 
 
 
@@ -48,12 +50,12 @@ public class GuavaCacheTest {
          * @throws Pausable
          */
         @Override
-        public Integer load(String key) throws Exception, Pausable {
+        public Integer load(String key) {
             // inner class method , need
             LoadTask loadTask = new LoadTask();
             loadTask.start();
 
-            return loadTask.calcValue.get();
+            return loadTask.calcValue.getb();
         }
 
         /**
@@ -65,14 +67,14 @@ public class GuavaCacheTest {
          * @throws Pausable
          */
         @Override
-        public ListenableFuture reload(String key, Integer oldValue) throws Exception, Pausable {
+        public ListenableFuture reload(String key, Integer oldValue) {
 
             LoadTask loadTask = new LoadTask();
             loadTask.start();
-            loadTask.calcValue.get();
+            loadTask.calcValue.getb();
 
             SettableFuture settableFuture = SettableFuture.create();
-            settableFuture.set(loadTask.calcValue.get());
+            settableFuture.set(loadTask.calcValue.getb());
 
             return settableFuture;
         }
@@ -85,14 +87,15 @@ public class GuavaCacheTest {
         Mailbox<Integer> calcValue = new Mailbox<>();
 
         @Override
-        public void execute() throws Pausable, Pausable {
+        public void execute() throws Pausable {
             sleep(10);
-
             calcValue.put(random.nextInt(1000));
         }
     }
 
     public static void main(String[] args) throws ExecutionException {
+        if (kilim.tools.Kilim.trampoline(false,args))
+            return;
         GuavaCacheTest guavaCacheTest = new GuavaCacheTest();
 
         while (true) {
