@@ -2,8 +2,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.db4j</groupId>
-    <artifactId>kilim-demos</artifactId>
-    <name>kilim_demos</name>
+    <artifactId>kilim-demo</artifactId>
+    <name>guava_cache_kilim</name>
     <version>0.1</version>
 
     <dependencies>
