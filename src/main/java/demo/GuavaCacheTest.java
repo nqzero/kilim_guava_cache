@@ -5,7 +5,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import kilim.Mailbox;
 import kilim.Pausable;
 import kilim.Task;
 
@@ -16,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 /**
  *
 * this example use google guava cache as the memory cache . the first request will invoke load() method in the CacheLoader
- * and after that the return value will be cached , the cached value will be refreshed every 2 minits. there's a inner
+ * and after that the return value will be cached, the cached value will be refreshed every second. there's a inner
  * Scheduler will do this job .
  *
  * Created by adamshuang on 2018/8/9.
@@ -27,22 +26,17 @@ public class GuavaCacheTest {
 
     public final LoadingCache<String, Integer> loadingCache =
             CacheBuilder.newBuilder()
-                    .refreshAfterWrite(2, TimeUnit.MINUTES)
+                    .refreshAfterWrite(1, TimeUnit.SECONDS)
                     .build(new KilimCacheLoader());
 
 
+    public static final Integer dummy = new Integer(-42883);
 
     class KilimCacheLoader extends CacheLoader<String, Integer> {
 
 
         /**
-         * this method won't work because the meothod call this 'load()' method doesn't throw pausble itself ,
-         * it tried to rewrite it , but it seems not feasible because there's tons of codes to change .
-         *
-         * of course i could use 'getb()' to avoid throw pausable , but it will block the thread. this will bring
-         * lots of problem in a busy server . many task can't be executed .
-         *
-         * so is there any smart way to to this ?
+         * guava doesn't support an async load, so just return a dummy value
          *
          * @param key
          * @return
@@ -51,11 +45,7 @@ public class GuavaCacheTest {
          */
         @Override
         public Integer load(String key) {
-            // inner class method , need
-            LoadTask loadTask = new LoadTask();
-            loadTask.start();
-
-            return loadTask.calcValue.getb();
+            return dummy;
         }
 
         /**
@@ -68,40 +58,64 @@ public class GuavaCacheTest {
          */
         @Override
         public ListenableFuture reload(String key, Integer oldValue) {
-
             LoadTask loadTask = new LoadTask();
             loadTask.start();
-            loadTask.calcValue.getb();
-
-            SettableFuture settableFuture = SettableFuture.create();
-            settableFuture.set(loadTask.calcValue.getb());
-
-            return settableFuture;
+            return loadTask.future;
         }
 
     }
 
     class LoadTask extends Task {
-
+        SettableFuture future = SettableFuture.create();
         Random random = new Random();
-        Mailbox<Integer> calcValue = new Mailbox<>();
 
         @Override
         public void execute() throws Pausable {
             sleep(10);
-            calcValue.put(random.nextInt(1000));
+            future.set(random.nextInt(1000));
         }
     }
 
-    public static void main(String[] args) throws ExecutionException {
+    /**
+     * get a value from the cache, retrying until it loads
+     * @param key
+     * @return the value associated with the key
+     * @throws Pausable 
+     */
+    public Integer get(String key) throws Pausable {
+        Integer result = null;
+        while (true) {
+            try {
+                result = loadingCache.get(key);
+            }
+            catch (ExecutionException ex) {}
+            if (result==dummy)
+                loadingCache.refresh(key);
+            else if (result==null)
+                System.out.println("retry");
+            else
+                return result;
+            Task.sleep(100);
+        }
+    }
+    
+    class QuizTask extends Task {
+        public void execute() throws Pausable {
+            while (true) {
+                Integer val = get("any_key");
+                System.out.println(val);
+                Task.sleep(100);
+            }
+        }
+    }
+    
+    
+    public static void main(String[] args) throws Exception {
         if (kilim.tools.Kilim.trampoline(false,args))
             return;
         GuavaCacheTest guavaCacheTest = new GuavaCacheTest();
 
-        while (true) {
-            System.out.println(guavaCacheTest.loadingCache.get("any_key"));
-        }
-
+        guavaCacheTest.new QuizTask().start();
 
     }
 
