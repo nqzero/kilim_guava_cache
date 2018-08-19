@@ -23,39 +23,51 @@ import java.util.concurrent.TimeUnit;
 
 
 public class GuavaCacheTest {
-
-    public final LoadingCache<String, Integer> loadingCache =
-            CacheBuilder.newBuilder()
-                    .refreshAfterWrite(1, TimeUnit.SECONDS)
-                    .build(new KilimCacheLoader());
-
-
-    public static final Integer dummy = new Integer(-42883);
     Random random = new Random();
+    public static final Object dummy = new Object();
 
-    class KilimCacheLoader extends CacheLoader<String, Integer> {
-        public Integer load(String key) {
-            return dummy;
+    public final LoadingCache<String,Integer> loadingCache = CacheBuilder.newBuilder()
+            .refreshAfterWrite(1,TimeUnit.SECONDS)
+            .build(new KilimCacheLoader(
+                    future -> {
+                        Task.sleep(10);
+                        future.set(random.nextInt(1000));
+                    }
+            ));
+
+
+
+    public static class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
+        PausableFuture body;
+        public KilimCacheLoader() {}
+        public KilimCacheLoader(PausableFuture body) { this.body = body; }
+
+        public VV load(KK key) {
+            return (VV) dummy;
         }
-
-        public ListenableFuture reload(String key, Integer oldValue) {
+        public ListenableFuture reload(KK key,VV oldValue) {
             SettableFuture future = SettableFuture.create();
             Task.fork(() -> {
-                Task.sleep(10);
-                future.set(random.nextInt(1000));
+                if (body==null) body(future);
+                else body.body(future);
             });
             return future;
         }
-
+        public void body(SettableFuture future) throws Pausable {}
     }
 
-    public Integer get(String key) throws Pausable {
-        Integer result = null;
+    public interface PausableFuture {
+        void body(SettableFuture future) throws Pausable;
+    }
+    
+
+    public static <KK,VV> VV get(LoadingCache<KK,VV> cache,KK key) throws Pausable {
+        VV result = null;
         while (true) {
             try {
-                result = loadingCache.get(key);
+                result = cache.get(key);
                 if (result==dummy)
-                    loadingCache.refresh(key);
+                    cache.refresh(key);
                 else
                     return result;
             }
@@ -72,7 +84,7 @@ public class GuavaCacheTest {
 
         Task.fork(() -> {
             while (true) {
-                System.out.println(cache.get("any_key"));
+                System.out.println(cache.get(cache.loadingCache,"any_key"));
                 Task.sleep(100);
             }
 
