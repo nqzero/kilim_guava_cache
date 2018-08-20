@@ -15,7 +15,7 @@ import static demo.KilimCacheLoader.getCache;
  *
  * Created by adamshuang on 2018/8/9.
  */
-public class GuavaCacheTest {
+public class GuavaCacheDemo {
     
     public static void main(String[] args) throws Exception {
         if (kilim.tools.Kilim.trampoline(false,args))
