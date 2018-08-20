@@ -9,15 +9,12 @@ import java.util.concurrent.TimeUnit;
 import static demo.KilimCacheLoader.getCache;
 
 /**
- *
-* this example use google guava cache as the memory cache . the first request will invoke load() method in the CacheLoader
- * and after that the return value will be cached, the cached value will be refreshed every second. there's a inner
- * Scheduler will do this job .
+ * example usage of the kilim-guava-cache-integration.
+ * the first load() returns a dummy value which triggers an asynchronous reload.
+ * all access is performed using the pausable getCache
  *
  * Created by adamshuang on 2018/8/9.
  */
-
-
 public class GuavaCacheTest {
     
     public static void main(String[] args) throws Exception {
