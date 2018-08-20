@@ -32,8 +32,22 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
     }
 
     public void body(SettableFuture future) throws Pausable {}
+
+
+    public static class Getter<KK,VV> {
+        LoadingCache<KK,VV> cache;
+        int delay;
+        public Getter(LoadingCache<KK,VV> cache,int delay) {
+            this.cache = cache;
+            this.delay = delay;
+        }
+        public VV get(KK key) throws Pausable {
+            return getCache(cache,key,delay);            
+        }
+    }
+
     
-    public static <KK,VV> VV get(LoadingCache<KK,VV> cache,KK key) throws Pausable {
+    public static <KK,VV> VV getCache(LoadingCache<KK,VV> cache,KK key,int delay) throws Pausable {
         VV result = null;
         while (true) {
             try {
@@ -44,7 +58,7 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
                     return result;
             }
             catch (ExecutionException ex) {}
-            Task.sleep(100);
+            Task.sleep(delay);
         }
     }
 }

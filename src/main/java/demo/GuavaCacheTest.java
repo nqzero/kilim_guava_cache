@@ -2,11 +2,11 @@ package demo;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
-import static demo.KilimCacheLoader.get;
 import kilim.Task;
 
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import static demo.KilimCacheLoader.getCache;
 
 /**
  *
@@ -19,32 +19,28 @@ import java.util.concurrent.TimeUnit;
 
 
 public class GuavaCacheTest {
-    Random random = new Random();
-
-    public final LoadingCache<String,Integer> loadingCache = CacheBuilder.newBuilder()
-            .refreshAfterWrite(1,TimeUnit.SECONDS)
-            .build(new KilimCacheLoader(
-                    future -> {
-                        Task.sleep(10);
-                        future.set(random.nextInt(1000));
-                    }
-            ));
-
-
-
-
-    
-
-    
     
     public static void main(String[] args) throws Exception {
         if (kilim.tools.Kilim.trampoline(false,args))
             return;
-        GuavaCacheTest cache = new GuavaCacheTest();
 
+        Random random = new Random();
+
+        LoadingCache<String,Integer> cache = CacheBuilder.newBuilder()
+                .refreshAfterWrite(1,TimeUnit.SECONDS)
+                .build(new KilimCacheLoader(
+                        future -> {
+                            Task.sleep(10);
+                            future.set(random.nextInt(1000));
+                        }
+                ));
+        
+        
+        
         Task.fork(() -> {
             while (true) {
-                System.out.println(get(cache.loadingCache,"any_key"));
+                int val = getCache(cache,"any_key",50);
+                System.out.println(val);
                 Task.sleep(100);
             }
 
