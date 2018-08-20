@@ -1,15 +1,11 @@
 package demo;
 
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
-import kilim.Pausable;
+import static demo.KilimCacheLoader.get;
 import kilim.Task;
 
 import java.util.Random;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -24,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 
 public class GuavaCacheTest {
     Random random = new Random();
-    public static final Object dummy = new Object();
 
     public final LoadingCache<String,Integer> loadingCache = CacheBuilder.newBuilder()
             .refreshAfterWrite(1,TimeUnit.SECONDS)
@@ -37,44 +32,9 @@ public class GuavaCacheTest {
 
 
 
-    public static class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
-        PausableFuture body;
-        public KilimCacheLoader() {}
-        public KilimCacheLoader(PausableFuture body) { this.body = body; }
 
-        public VV load(KK key) {
-            return (VV) dummy;
-        }
-        public ListenableFuture reload(KK key,VV oldValue) {
-            SettableFuture future = SettableFuture.create();
-            Task.fork(() -> {
-                if (body==null) body(future);
-                else body.body(future);
-            });
-            return future;
-        }
-        public void body(SettableFuture future) throws Pausable {}
-    }
-
-    public interface PausableFuture {
-        void body(SettableFuture future) throws Pausable;
-    }
     
 
-    public static <KK,VV> VV get(LoadingCache<KK,VV> cache,KK key) throws Pausable {
-        VV result = null;
-        while (true) {
-            try {
-                result = cache.get(key);
-                if (result==dummy)
-                    cache.refresh(key);
-                else
-                    return result;
-            }
-            catch (ExecutionException ex) {}
-            Task.sleep(100);
-        }
-    }
     
     
     public static void main(String[] args) throws Exception {
@@ -84,7 +44,7 @@ public class GuavaCacheTest {
 
         Task.fork(() -> {
             while (true) {
-                System.out.println(cache.get(cache.loadingCache,"any_key"));
+                System.out.println(get(cache.loadingCache,"any_key"));
                 Task.sleep(100);
             }
 
