@@ -46,7 +46,19 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
         }
     }
 
-    
+
+    /**
+     * get a value from the cache asynchronously.
+     * this method (or similar logic) must be used for all access.
+     * if the key is not available immediately this method pauses until it is ready
+     * @param <KK> the key type
+     * @param <VV> the value type
+     * @param cache the cache to access
+     * @param key the key to search for
+     * @param delay the number of milliseconds to suspend if the value is not yet available
+     * @return
+     * @throws Pausable 
+     */    
     public static <KK,VV> VV getCache(LoadingCache<KK,VV> cache,KK key,int delay) throws Pausable {
         VV result = null;
         while (true) {
