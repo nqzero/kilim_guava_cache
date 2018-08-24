@@ -61,13 +61,16 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
      */    
     public static <KK,VV> VV getCache(LoadingCache<KK,VV> cache,KK key,int delay) throws Pausable {
         VV result = null;
+        boolean first = true;
         while (true) {
             try {
                 result = cache.get(key);
-                if (result==dummy)
-                    cache.refresh(key);
+                if (result==dummy) {
+                    if (first) cache.refresh(key);
+                }
                 else
                     return result;
+                first = false;
             }
             catch (ExecutionException ex) {}
             Task.sleep(delay);
