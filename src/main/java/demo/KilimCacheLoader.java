@@ -5,6 +5,8 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import kilim.Pausable;
 import kilim.Task;
 
@@ -46,6 +48,7 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
         }
     }
 
+    public static class Dummy {}
 
     /**
      * get a value from the cache asynchronously.
@@ -62,18 +65,27 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
     public static <KK,VV> VV getCache(LoadingCache<KK,VV> cache,KK key,int delay) throws Pausable {
         VV result = null;
         boolean first = true;
+        Object d2 = new Dummy();
         while (true) {
             try {
-                result = cache.get(key);
-                if (result==dummy) {
+                result = cache.get(key,() -> {
+                    return (VV) d2;
+                });
+                if (result==d2) {
                     if (first) cache.refresh(key);
+                    first = false;
                 }
+                else if (result instanceof Dummy)
+                    first = true;
                 else
                     return result;
-                first = false;
             }
             catch (ExecutionException ex) {}
             Task.sleep(delay);
         }
+    }
+
+    public static void main(String[] args) throws Exception {
+        GuavaCacheDemo.main(args);
     }
 }
