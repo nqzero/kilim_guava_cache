@@ -1,18 +1,21 @@
 package demo;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import kilim.Mailbox;
 import kilim.Pausable;
 import kilim.Task;
 
 public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
     public interface PausableFuture {
         void body(SettableFuture future) throws Pausable;
+    }
+    public interface Body<KK,VV> {
+        VV body(KK key) throws Pausable;
     }
 
     private static final Object dummy = new Object();
@@ -36,19 +39,8 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
     public void body(SettableFuture future) throws Pausable {}
 
 
-    public static class Getter<KK,VV> {
-        LoadingCache<KK,VV> cache;
-        int delay;
-        public Getter(LoadingCache<KK,VV> cache,int delay) {
-            this.cache = cache;
-            this.delay = delay;
-        }
-        public VV get(KK key) throws Pausable {
-            return getCache(cache,key,delay);            
-        }
-    }
 
-    public static class Dummy {}
+    public static class Dummy<VV> extends Mailbox<Mailbox<VV>> {}
 
     /**
      * get a value from the cache asynchronously.
@@ -62,26 +54,26 @@ public class KilimCacheLoader<KK,VV> extends CacheLoader<KK,VV> {
      * @return
      * @throws Pausable 
      */    
-    public static <KK,VV> VV getCache(LoadingCache<KK,VV> cache,KK key,int delay) throws Pausable {
-        VV result = null;
-        boolean first = true;
-        Object d2 = new Dummy();
+    public static <KK,VV> VV getCache(Cache<KK,VV> cache,Body<KK,VV> body,KK key,int delay) throws Pausable {
+        Dummy<VV> d2 = new Dummy();
+        Mailbox<VV> mb;
         while (true) {
             try {
-                result = cache.get(key,() -> {
-                    return (VV) d2;
-                });
+                VV result = cache.get(key,() -> ((VV) d2));
                 if (result==d2) {
-                    if (first) cache.refresh(key);
-                    first = false;
+                    VV val = body.body(key);
+                    cache.put(key,val);
+                    while ((mb = d2.get(0)) != null)
+                        mb.put(val);
                 }
-                else if (result instanceof Dummy)
-                    first = true;
+                else if (result instanceof Dummy) {
+                    ((Dummy) result).put(mb = new Mailbox());
+                    return mb.get();
+                }
                 else
                     return result;
             }
             catch (ExecutionException ex) {}
-            Task.sleep(delay);
         }
     }
 

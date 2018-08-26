@@ -1,12 +1,12 @@
 package demo;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import kilim.Task;
 
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 import static demo.KilimCacheLoader.getCache;
+import demo.KilimCacheLoader.Body;
 
 /**
  * stress test of the kilim-guava-cache-integration.
@@ -20,40 +20,38 @@ public class GuavaCacheDemo {
             return;
 
         Random random = new Random();
-        int numTasks = 2;
-        int maxIters = 1;
-        int maxKey = 2;
-        int maxVal = 1000;
+        int numTasks = 200;
+        int maxIters = 1000;
+        int maxKey = 1100;
         int maxDelay = 100;
-        int maxSize = 1;
-        int refresh = 10;
+        int maxSize = 1000;
         int maxWait = 100;
         int retry = 50;
 
-        LoadingCache<Integer,Integer> cache = CacheBuilder.newBuilder()
-                .refreshAfterWrite(refresh,TimeUnit.SECONDS)
+        Cache<Integer,Double> cache = CacheBuilder.newBuilder()
                 .maximumSize(maxSize)
-                .build(new KilimCacheLoader(
-                        future -> {
-                            Task.sleep(random.nextInt(maxDelay));
-                            future.set(random.nextInt(maxVal));
-                        }
-                ));
+                .build();
         
         
 
+        Body<Integer,Double> getter = key -> {
+            Task.sleep(random.nextInt(maxDelay));
+            return key + random.nextDouble();
+        };
+        
 
         for (int jj=0; jj < numTasks; jj++) {
             int ktask = jj;
             Task.fork(() -> {
                 while (true) {
                     int numIters = random.nextInt(maxIters);
-                    for (int ii=0,sum=0; ii <= numIters; ii++) {
+                    double sum = 0;
+                    for (int ii=1; ii <= numIters; ii++) {
                         Task.sleep(random.nextInt(maxWait));
                         int key = random.nextInt(maxKey);
-                        sum += getCache(cache,key,retry);
+                        sum += getCache(cache,getter,key,retry);
                         if (ii==numIters)
-                            System.out.format("cache: %4d -> %8d\n",ktask,sum);
+                            System.out.format("cache: %4d -> %8.3f\n",ktask,sum/numIters);
                     }
                 }
             });
