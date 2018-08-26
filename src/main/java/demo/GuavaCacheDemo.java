@@ -1,12 +1,14 @@
 package demo;
 
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import kilim.Task;
 
 import java.util.Random;
 import static demo.KilimCacheLoader.getCache;
 import demo.KilimCacheLoader.Body;
+import java.util.concurrent.TimeUnit;
 
 /**
  * stress test of the kilim-guava-cache-integration.
@@ -25,11 +27,14 @@ public class GuavaCacheDemo {
         int maxDelay = 100;
         int maxSize = 1000;
         int maxWait = 100;
+        int refresh = 10000;
 
-        Cache<Integer,Double> cache = CacheBuilder.newBuilder()
-                .maximumSize(maxSize)
-                .build();
         
+        
+        LoadingCache<Integer,Double> cache = CacheBuilder.newBuilder()
+                .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
+                .maximumSize(maxSize)
+                .build(new CacheLoader() { public Object load(Object arg0) { return null; } });
         
 
         Body<Integer,Double> getter = key -> {
