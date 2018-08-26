@@ -20,15 +20,15 @@ public class GuavaCacheDemo {
             return;
 
         Random random = new Random();
-        int numTasks = 1000;
-        int maxIters = 100;
-        int maxKey = 1100;
+        int numTasks = 2;
+        int maxIters = 1;
+        int maxKey = 2;
         int maxVal = 1000;
-        int maxDelay = 1000;
-        int maxSize = 1000;
+        int maxDelay = 100;
+        int maxSize = 1;
         int refresh = 10;
-        int maxWait = 1000;
-        int retry = 200;
+        int maxWait = 100;
+        int retry = 50;
 
         LoadingCache<Integer,Integer> cache = CacheBuilder.newBuilder()
                 .refreshAfterWrite(refresh,TimeUnit.SECONDS)
