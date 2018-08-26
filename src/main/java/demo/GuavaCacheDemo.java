@@ -10,7 +10,6 @@ import demo.KilimCacheLoader.Body;
 
 /**
  * stress test of the kilim-guava-cache-integration.
- * the first load() returns a dummy value which triggers an asynchronous reload.
  * all access is performed using the pausable getCache
  */
 public class GuavaCacheDemo {
@@ -26,7 +25,6 @@ public class GuavaCacheDemo {
         int maxDelay = 100;
         int maxSize = 1000;
         int maxWait = 100;
-        int retry = 50;
 
         Cache<Integer,Double> cache = CacheBuilder.newBuilder()
                 .maximumSize(maxSize)
@@ -49,7 +47,7 @@ public class GuavaCacheDemo {
                     for (int ii=1; ii <= numIters; ii++) {
                         Task.sleep(random.nextInt(maxWait));
                         int key = random.nextInt(maxKey);
-                        sum += getCache(cache,getter,key,retry);
+                        sum += getCache(cache,getter,key);
                         if (ii==numIters)
                             System.out.format("cache: %4d -> %8.3f\n",ktask,sum/numIters);
                     }
