@@ -25,12 +25,12 @@ public class GuavaCacheDemo {
         int maxWait = 100;
         int refresh = 10000;
         
-        KilimCacheLoader<Integer,Double> loader = new KilimCacheLoader(
+        KilimCache<Integer,Double> loader = new KilimCache(
                 CacheBuilder.newBuilder()
                         .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
                         .maximumSize(maxSize));
 
-        loader.setReloader(key -> {
+        loader.set(key -> {
             Task.sleep(random.nextInt(maxDelay));
             return key+random.nextDouble();
         });

@@ -8,7 +8,7 @@ import java.util.concurrent.ExecutionException;
 import kilim.Mailbox;
 import kilim.Pausable;
 
-public class KilimCacheLoader<KK,VV> {
+public class KilimCache<KK,VV> {
     public interface Loadable<KK,VV> {
         VV body(KK key) throws Pausable;
     }
@@ -16,21 +16,21 @@ public class KilimCacheLoader<KK,VV> {
 
     public static class Dummy<VV> extends Mailbox<Mailbox<VV>> {}
 
-    public Loadable<KK,VV> body;
-    public LoadingCache<KK,VV> cache;
+    public Loadable<KK,VV> loader;
+    public LoadingCache<KK,VV> guava;
     
-    public KilimCacheLoader(CacheBuilder<KK,VV> builder) {
-        cache = builder.build(new CacheLoader() { public Object load(Object arg0) { return null; } });
+    public KilimCache(CacheBuilder<KK,VV> builder) {
+        guava = builder.build(new CacheLoader() { public Object load(Object arg0) { return null; } });
     }
 
-    public KilimCacheLoader<KK,VV> setReloader(Loadable<KK,VV> body) {
-        this.body = body;
+    public KilimCache<KK,VV> set(Loadable<KK,VV> body) {
+        this.loader = body;
         return this;
     }
     
 
     public VV get(KK key) throws Pausable {
-        return getCache(cache,body,key);
+        return getCache(guava,loader,key);
     }    
     
     /**
