@@ -1,13 +1,9 @@
 package demo;
 
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import kilim.Task;
 
 import java.util.Random;
-import static demo.KilimCacheLoader.getCache;
-import demo.KilimCacheLoader.Body;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -28,20 +24,16 @@ public class GuavaCacheDemo {
         int maxSize = 1000;
         int maxWait = 100;
         int refresh = 10000;
+        
+        KilimCacheLoader<Integer,Double> loader = new KilimCacheLoader(
+                CacheBuilder.newBuilder()
+                        .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
+                        .maximumSize(maxSize));
 
-        
-        
-        LoadingCache<Integer,Double> cache = CacheBuilder.newBuilder()
-                .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
-                .maximumSize(maxSize)
-                .build(new CacheLoader() { public Object load(Object arg0) { return null; } });
-        
-
-        Body<Integer,Double> getter = key -> {
+        loader.setReloader(key -> {
             Task.sleep(random.nextInt(maxDelay));
-            return key + random.nextDouble();
-        };
-        
+            return key+random.nextDouble();
+        });
 
         for (int jj=0; jj < numTasks; jj++) {
             int ktask = jj;
@@ -52,7 +44,7 @@ public class GuavaCacheDemo {
                     for (int ii=1; ii <= numIters; ii++) {
                         Task.sleep(random.nextInt(maxWait));
                         int key = random.nextInt(maxKey);
-                        sum += getCache(cache,getter,key);
+                        sum += loader.get(key);
                         if (ii==numIters)
                             System.out.format("cache: %4d -> %8.3f\n",ktask,sum/numIters);
                     }
