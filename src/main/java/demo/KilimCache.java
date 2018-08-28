@@ -1,6 +1,5 @@
 package demo;
 
-import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -21,10 +20,6 @@ public class KilimCache<KK,VV> {
         volatile boolean dead;
     }
 
-
-    // guava logs null values - make it clear that this is intentional
-    public static class HarmlessException extends Exception {}
-
     public Reloadable<KK,VV> reloader;
     public LoadingCache<KK,VV> guava;
     
@@ -43,7 +38,7 @@ public class KilimCache<KK,VV> {
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
             Relay<VV> relay = new Relay();
-            Task.fork(() -> send(guava,reloader,key,null,relay));
+            Task.fork(() -> send(key,null,relay));
             return (VV) relay;
         }
         public ListenableFuture reload(Object key,Object prev) {
@@ -77,7 +72,7 @@ public class KilimCache<KK,VV> {
                 catch (ExecutionException ex) { impossible(ex); }
 
             if (result==relay)
-                return send(guava,reloader,key,prev,relay);
+                return send(key,prev,relay);
             else if (result instanceof Relay) {
                 Mailbox<VV> mb = new Mailbox();
                 Relay master = (Relay) result;
@@ -97,11 +92,9 @@ public class KilimCache<KK,VV> {
         }
     }
 
-    private static
-        <VV,KK> VV send(Cache<KK,VV> cache,Reloadable<KK,VV> body,KK key,VV prev,Relay<VV> relay)
-            throws Pausable {
-        VV val = body.body(key,prev);
-        cache.put(key,val);
+    private VV send(KK key,VV prev,Relay<VV> relay) throws Pausable {
+        VV val = reloader.body(key,prev);
+        guava.put(key,val);
         synchronized (relay) {
             relay.dead = true;
         }
