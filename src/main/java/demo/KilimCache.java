@@ -9,6 +9,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.util.concurrent.ExecutionException;
 import kilim.Mailbox;
 import kilim.Pausable;
+import kilim.Task;
 
 public class KilimCache<KK,VV> {
     public interface Loadable<KK,VV> {
@@ -26,16 +27,22 @@ public class KilimCache<KK,VV> {
     public LoadingCache<KK,VV> guava;
     
     public KilimCache(CacheBuilder<KK,VV> builder) {
-        guava = builder.build(new CacheLoader() {
-            public Object load(Object arg0) throws Exception {
-                throw new HarmlessException();
-            }
-            public ListenableFuture reload(Object key,Object prev) {
-                return Futures.immediateFuture(prev);
-            }
-        });
+        guava = builder.build(new MyLoader());
     }
 
+    private class MyLoader extends CacheLoader<KK,VV> {
+        public VV load(KK key) throws Exception {
+            Dummy<VV> d2 = new Dummy();
+            Task.fork(() -> send(guava,loader,key,null,d2));
+            return (VV) d2;
+        }
+        public ListenableFuture reload(Object key,Object prev) {
+            return Futures.immediateFuture(prev);
+        }
+    }
+
+    
+    
     public KilimCache<KK,VV> set(Loadable<KK,VV> body) {
         this.loader = body;
         return this;
@@ -59,26 +66,35 @@ public class KilimCache<KK,VV> {
      * @param key the key to search for
      * @return
      * @throws Pausable 
-     */    
+     */
     public static <KK,VV> VV getCache(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key) throws Pausable {
         Dummy<VV> d2 = new Dummy();
         Mailbox<VV> mb;
-        VV prev = cache.getIfPresent(key);
         VV result = null;
-        try { result = cache.get(key,() -> ((VV) d2)); }
-        catch (ExecutionException ex) { impossible(ex); }
-        if (result==d2) {
-            VV val = body.body(key,prev instanceof Dummy ? null:prev);
-            cache.put(key,val);
-            while ((mb = d2.get(0)) != null)
-                mb.put(val);
-            return val;
-        }
+        VV prev = cache.getIfPresent(key);
+        if (prev instanceof Dummy)
+            result = prev;
+        else
+            try { result = cache.get(key,() -> ((VV) d2)); }
+            catch (ExecutionException ex) { impossible(ex); }
+
+        if (result==d2)
+            return send(cache,body,key,prev,d2);
         else if (result instanceof Dummy) {
             ((Dummy) result).put(mb = new Mailbox());
             return mb.get();
         }
         else
             return result;
+    }
+
+    private static
+        <VV,KK> VV send(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key,VV prev,Dummy<VV> d2)
+            throws Pausable {
+        VV val = body.body(key,prev);
+        cache.put(key,val);
+        for (Mailbox<VV> mb; (mb = d2.get(0)) != null; )
+            mb.put(val);
+        return val;
     }
 }
