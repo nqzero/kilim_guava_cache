@@ -24,13 +24,16 @@ public class GuavaCacheDemo {
         int maxSize = 1000;
         int maxWait = 100;
         int refresh = 10000;
+        int maxNever = 100;
         
         KilimCache<Integer,Double> loader = new KilimCache(
                 CacheBuilder.newBuilder()
                         .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
                         .maximumSize(maxSize));
 
-        loader.set(key -> {
+        loader.set((Integer key,Double prev) -> {
+            if (key < maxNever & prev != null)
+                return prev;
             Task.sleep(random.nextInt(maxDelay));
             return key+random.nextDouble();
         });
@@ -44,7 +47,7 @@ public class GuavaCacheDemo {
                     for (int ii=1; ii <= numIters; ii++) {
                         Task.sleep(random.nextInt(maxWait));
                         int key = random.nextInt(maxKey);
-                        sum += loader.get(key);
+                        sum += loader.get(key) - key;
                         if (ii==numIters)
                             System.out.format("cache: %4d -> %8.3f\n",ktask,sum/numIters);
                     }
