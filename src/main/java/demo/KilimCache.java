@@ -17,7 +17,9 @@ public class KilimCache<KK,VV> {
     }
 
 
-    public static class Dummy<VV> extends Mailbox<Mailbox<VV>> {}
+    public static class Dummy<VV> extends Mailbox<Mailbox<VV>> {
+        volatile boolean dead;
+    }
 
 
     // guava logs null values - make it clear that this is intentional
@@ -69,7 +71,8 @@ public class KilimCache<KK,VV> {
      */
     public static <KK,VV> VV getCache(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key) throws Pausable {
         Dummy<VV> d2 = new Dummy();
-        Mailbox<VV> mb;
+        cache:
+        while (true) {
         VV result = null;
         VV prev = cache.getIfPresent(key);
         if (prev instanceof Dummy)
@@ -81,11 +84,26 @@ public class KilimCache<KK,VV> {
         if (result==d2)
             return send(cache,body,key,prev,d2);
         else if (result instanceof Dummy) {
-            ((Dummy) result).put(mb = new Mailbox());
-            return mb.get();
+            Mailbox<VV> mb = null;
+            Dummy d3 = (Dummy) result;
+            while (true) {
+                synchronized (d3) {
+                    if (d3.dead)
+                        continue cache;
+                    if (d3.putnb(mb = new Mailbox()))
+                        break;
+                }
+                System.out.println("mailbox overflow");
+                Task.sleep(0);
+            }
+            VV val = mb.get(10000);
+            if (val==null)
+                throw new RuntimeException("mailbox race condition");
+            return val;
         }
         else
             return result;
+        }
     }
 
     private static
@@ -93,6 +111,9 @@ public class KilimCache<KK,VV> {
             throws Pausable {
         VV val = body.body(key,prev);
         cache.put(key,val);
+        synchronized (d2) {
+            d2.dead = true;
+        }
         for (Mailbox<VV> mb; (mb = d2.get(0)) != null; )
             mb.put(val);
         return val;
