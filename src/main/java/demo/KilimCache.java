@@ -54,35 +54,27 @@ public class KilimCache<KK,VV> {
         throw new RuntimeException("this should never happen",ex);
     }
 
-    public VV get(KK key) throws Pausable {
-        return getCache(guava,reloader,key);
-    }    
-    
     /**
      * get a value from the cache asynchronously.this method (or similar logic) must be used for all access.
      * if the key is not available immediately this method pauses until it is ready
-     * @param <KK> the key type
-     * @param <VV> the value type
-     * @param cache the cache to access
-     * @param body lambda that returns the value associated with a key
-     * @param key the key to search for
-     * @return
+     * @param key the key to lookup
+     * @return the cached value
      * @throws Pausable 
      */
-    public static <KK,VV> VV getCache(Cache<KK,VV> cache,Reloadable<KK,VV> body,KK key) throws Pausable {
+    public VV get(KK key) throws Pausable {
         Relay<VV> relay = new Relay();
         cache:
         while (true) {
             VV result = null;
-            VV prev = cache.getIfPresent(key);
+            VV prev = guava.getIfPresent(key);
             if (prev instanceof Relay)
                 result = prev;
             else
-                try { result = cache.get(key,() -> ((VV) relay)); }
+                try { result = guava.get(key,() -> ((VV) relay)); }
                 catch (ExecutionException ex) { impossible(ex); }
 
             if (result==relay)
-                return send(cache,body,key,prev,relay);
+                return send(guava,reloader,key,prev,relay);
             else if (result instanceof Relay) {
                 Mailbox<VV> mb = new Mailbox();
                 Relay master = (Relay) result;
