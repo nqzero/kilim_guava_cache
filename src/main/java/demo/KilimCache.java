@@ -42,7 +42,7 @@ public class KilimCache<KK,VV> {
         }
     }
     public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
-        volatile boolean dead;
+        public VV dead;
     }
     private static void impossible(Throwable ex) {
         throw new RuntimeException("this should never happen",ex);
@@ -57,42 +57,39 @@ public class KilimCache<KK,VV> {
      */
     public VV get(KK key) throws Pausable {
         Relay<VV> relay = new Relay();
-        cache:
-        while (true) {
-            VV result = null;
-            VV prev = guava.getIfPresent(key);
-            if (prev instanceof Relay)
-                result = prev;
-            else
-                try { result = guava.get(key,() -> ((VV) relay)); }
-                catch (ExecutionException ex) { impossible(ex); }
+        VV result = null;
+        VV prev = guava.getIfPresent(key);
+        if (prev instanceof Relay)
+            result = prev;
+        else
+            try { result = guava.get(key,() -> ((VV) relay)); }
+            catch (ExecutionException ex) { impossible(ex); }
 
-            if (result==relay)
-                return send(key,prev,relay);
-            else if (result instanceof Relay) {
-                Mailbox<VV> mb = new Mailbox();
-                Relay master = (Relay) result;
-                while (true) {
-                    synchronized (master) {
-                        if (master.dead)
-                            continue cache;
-                        if (master.putnb(mb))
-                            break;
-                    }
-                    Task.sleep(0);
+        if (result==relay)
+            return send(key,prev,relay);
+        else if (result instanceof Relay) {
+            Mailbox<VV> mb = new Mailbox();
+            Relay<VV> master = (Relay) result;
+            while (true) {
+                synchronized (master) {
+                    if (master.dead != null)
+                        return master.dead;
+                    if (master.putnb(mb))
+                        break;
                 }
-                return mb.get();
+                Task.sleep(0);
             }
-            else
-                return result;
+            return mb.get();
         }
+        else
+            return result;
     }
 
     private VV send(KK key,VV prev,Relay<VV> relay) throws Pausable {
         VV val = reloader.body(key,prev);
         guava.put(key,val);
         synchronized (relay) {
-            relay.dead = true;
+            relay.dead = val;
         }
         for (Mailbox<VV> mb; (mb = relay.get(0)) != null; )
             mb.put(val);
