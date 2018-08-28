@@ -84,13 +84,12 @@ public class KilimCache<KK,VV> {
             if (result==relay)
                 return send(cache,body,key,prev,relay);
             else if (result instanceof Relay) {
-                Mailbox<VV> mb;
+                Mailbox<VV> mb = new Mailbox();
                 Relay master = (Relay) result;
                 while (true) {
                     synchronized (master) {
                         if (master.dead)
                             continue cache;
-                        mb = new Mailbox();
                         if (master.putnb(mb))
                             break;
                     }
