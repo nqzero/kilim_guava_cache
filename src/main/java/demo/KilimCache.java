@@ -27,7 +27,10 @@ public class KilimCache<KK,VV> {
         this.loader = body;
         return this;
     }
-    
+
+    private static void impossible(Throwable ex) {
+        throw new RuntimeException("this should never happen",ex);
+    }
 
     public VV get(KK key) throws Pausable {
         return getCache(guava,loader,key);
@@ -47,23 +50,21 @@ public class KilimCache<KK,VV> {
     public static <KK,VV> VV getCache(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key) throws Pausable {
         Dummy<VV> d2 = new Dummy();
         Mailbox<VV> mb;
-        while (true) {
-            try {
-                VV result = cache.get(key,() -> ((VV) d2));
-                if (result==d2) {
-                    VV val = body.body(key);
-                    cache.put(key,val);
-                    while ((mb = d2.get(0)) != null)
-                        mb.put(val);
-                }
-                else if (result instanceof Dummy) {
-                    ((Dummy) result).put(mb = new Mailbox());
-                    return mb.get();
-                }
-                else
-                    return result;
-            }
-            catch (ExecutionException ex) {}
+        VV result = null;
+        try { result = cache.get(key,() -> ((VV) d2)); }
+        catch (ExecutionException ex) { impossible(ex); }
+        if (result==d2) {
+            VV val = body.body(key);
+            cache.put(key,val);
+            while ((mb = d2.get(0)) != null)
+                mb.put(val);
+            return val;
         }
+        else if (result instanceof Dummy) {
+            ((Dummy) result).put(mb = new Mailbox());
+            return mb.get();
+        }
+        else
+            return result;
     }
 }
