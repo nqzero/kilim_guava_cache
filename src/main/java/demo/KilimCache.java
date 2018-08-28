@@ -10,14 +10,15 @@ import kilim.Mailbox;
 import kilim.Pausable;
 import kilim.Task;
 
+/**
+ * a wrapper around the guava {@code LoadingCache} to allow fully async lookup.
+ * the underlying cache is exposed
+ * @param <KK> the key type
+ * @param <VV> the value type
+ */
 public class KilimCache<KK,VV> {
     public interface Reloadable<KK,VV> {
         VV body(KK key,VV prev) throws Pausable;
-    }
-
-
-    public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
-        volatile boolean dead;
     }
 
     public Reloadable<KK,VV> reloader;
@@ -26,15 +27,10 @@ public class KilimCache<KK,VV> {
     public KilimCache(CacheBuilder<KK,VV> builder) {
         guava = builder.build(new MyLoader());
     }
-
     public KilimCache<KK,VV> register(Reloadable<KK,VV> reloader) {
         this.reloader = reloader;
         return this;
     }
-
-
-    
-    
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
             Relay<VV> relay = new Relay();
@@ -45,9 +41,9 @@ public class KilimCache<KK,VV> {
             return Futures.immediateFuture(prev);
         }
     }
-
-    
-    
+    public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
+        volatile boolean dead;
+    }
     private static void impossible(Throwable ex) {
         throw new RuntimeException("this should never happen",ex);
     }
