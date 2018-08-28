@@ -32,6 +32,14 @@ public class KilimCache<KK,VV> {
         guava = builder.build(new MyLoader());
     }
 
+    public KilimCache<KK,VV> register(Reloadable<KK,VV> reloader) {
+        this.reloader = reloader;
+        return this;
+    }
+
+
+    
+    
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
             Relay<VV> relay = new Relay();
@@ -45,11 +53,6 @@ public class KilimCache<KK,VV> {
 
     
     
-    public KilimCache<KK,VV> set(Reloadable<KK,VV> reloader) {
-        this.reloader = reloader;
-        return this;
-    }
-
     private static void impossible(Throwable ex) {
         throw new RuntimeException("this should never happen",ex);
     }

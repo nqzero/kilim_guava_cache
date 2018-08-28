@@ -31,12 +31,13 @@ public class GuavaCacheDemo {
                         .refreshAfterWrite(refresh,TimeUnit.MICROSECONDS)
                         .maximumSize(maxSize));
 
-        loader.set((Integer key,Double prev) -> {
-            if (key < maxNever & prev != null)
-                return prev;
-            Task.sleep(random.nextInt(maxDelay));
-            return key+random.nextDouble();
-        });
+        loader.register(
+                (Integer key,Double prev) -> {
+                    if (key < maxNever & prev != null)
+                        return prev;
+                    Task.sleep(random.nextInt(maxDelay));
+                    return key+random.nextDouble();
+                });
 
         for (int jj=0; jj < numTasks; jj++) {
             int ktask = jj;
