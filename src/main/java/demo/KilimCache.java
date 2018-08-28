@@ -12,7 +12,7 @@ import kilim.Pausable;
 import kilim.Task;
 
 public class KilimCache<KK,VV> {
-    public interface Loadable<KK,VV> {
+    public interface Reloadable<KK,VV> {
         VV body(KK key,VV prev) throws Pausable;
     }
 
@@ -25,7 +25,7 @@ public class KilimCache<KK,VV> {
     // guava logs null values - make it clear that this is intentional
     public static class HarmlessException extends Exception {}
 
-    public Loadable<KK,VV> loader;
+    public Reloadable<KK,VV> reloader;
     public LoadingCache<KK,VV> guava;
     
     public KilimCache(CacheBuilder<KK,VV> builder) {
@@ -35,7 +35,7 @@ public class KilimCache<KK,VV> {
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
             Relay<VV> relay = new Relay();
-            Task.fork(() -> send(guava,loader,key,null,relay));
+            Task.fork(() -> send(guava,reloader,key,null,relay));
             return (VV) relay;
         }
         public ListenableFuture reload(Object key,Object prev) {
@@ -45,8 +45,8 @@ public class KilimCache<KK,VV> {
 
     
     
-    public KilimCache<KK,VV> set(Loadable<KK,VV> body) {
-        this.loader = body;
+    public KilimCache<KK,VV> set(Reloadable<KK,VV> reloader) {
+        this.reloader = reloader;
         return this;
     }
 
@@ -55,7 +55,7 @@ public class KilimCache<KK,VV> {
     }
 
     public VV get(KK key) throws Pausable {
-        return getCache(guava,loader,key);
+        return getCache(guava,reloader,key);
     }    
     
     /**
@@ -69,7 +69,7 @@ public class KilimCache<KK,VV> {
      * @return
      * @throws Pausable 
      */
-    public static <KK,VV> VV getCache(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key) throws Pausable {
+    public static <KK,VV> VV getCache(Cache<KK,VV> cache,Reloadable<KK,VV> body,KK key) throws Pausable {
         Relay<VV> relay = new Relay();
         cache:
         while (true) {
@@ -104,7 +104,7 @@ public class KilimCache<KK,VV> {
     }
 
     private static
-        <VV,KK> VV send(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key,VV prev,Relay<VV> relay)
+        <VV,KK> VV send(Cache<KK,VV> cache,Reloadable<KK,VV> body,KK key,VV prev,Relay<VV> relay)
             throws Pausable {
         VV val = body.body(key,prev);
         cache.put(key,val);
