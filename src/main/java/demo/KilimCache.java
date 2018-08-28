@@ -17,7 +17,7 @@ public class KilimCache<KK,VV> {
     }
 
 
-    public static class Dummy<VV> extends Mailbox<Mailbox<VV>> {
+    public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
         volatile boolean dead;
     }
 
@@ -34,9 +34,9 @@ public class KilimCache<KK,VV> {
 
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
-            Dummy<VV> d2 = new Dummy();
-            Task.fork(() -> send(guava,loader,key,null,d2));
-            return (VV) d2;
+            Relay<VV> relay = new Relay();
+            Task.fork(() -> send(guava,loader,key,null,relay));
+            return (VV) relay;
         }
         public ListenableFuture reload(Object key,Object prev) {
             return Futures.immediateFuture(prev);
@@ -70,51 +70,48 @@ public class KilimCache<KK,VV> {
      * @throws Pausable 
      */
     public static <KK,VV> VV getCache(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key) throws Pausable {
-        Dummy<VV> d2 = new Dummy();
+        Relay<VV> relay = new Relay();
         cache:
         while (true) {
-        VV result = null;
-        VV prev = cache.getIfPresent(key);
-        if (prev instanceof Dummy)
-            result = prev;
-        else
-            try { result = cache.get(key,() -> ((VV) d2)); }
-            catch (ExecutionException ex) { impossible(ex); }
+            VV result = null;
+            VV prev = cache.getIfPresent(key);
+            if (prev instanceof Relay)
+                result = prev;
+            else
+                try { result = cache.get(key,() -> ((VV) relay)); }
+                catch (ExecutionException ex) { impossible(ex); }
 
-        if (result==d2)
-            return send(cache,body,key,prev,d2);
-        else if (result instanceof Dummy) {
-            Mailbox<VV> mb = null;
-            Dummy d3 = (Dummy) result;
-            while (true) {
-                synchronized (d3) {
-                    if (d3.dead)
-                        continue cache;
-                    if (d3.putnb(mb = new Mailbox()))
-                        break;
+            if (result==relay)
+                return send(cache,body,key,prev,relay);
+            else if (result instanceof Relay) {
+                Mailbox<VV> mb;
+                Relay master = (Relay) result;
+                while (true) {
+                    synchronized (master) {
+                        if (master.dead)
+                            continue cache;
+                        mb = new Mailbox();
+                        if (master.putnb(mb))
+                            break;
+                    }
+                    Task.sleep(0);
                 }
-                System.out.println("mailbox overflow");
-                Task.sleep(0);
+                return mb.get();
             }
-            VV val = mb.get(10000);
-            if (val==null)
-                throw new RuntimeException("mailbox race condition");
-            return val;
-        }
-        else
-            return result;
+            else
+                return result;
         }
     }
 
     private static
-        <VV,KK> VV send(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key,VV prev,Dummy<VV> d2)
+        <VV,KK> VV send(Cache<KK,VV> cache,Loadable<KK,VV> body,KK key,VV prev,Relay<VV> relay)
             throws Pausable {
         VV val = body.body(key,prev);
         cache.put(key,val);
-        synchronized (d2) {
-            d2.dead = true;
+        synchronized (relay) {
+            relay.dead = true;
         }
-        for (Mailbox<VV> mb; (mb = d2.get(0)) != null; )
+        for (Mailbox<VV> mb; (mb = relay.get(0)) != null; )
             mb.put(val);
         return val;
     }
