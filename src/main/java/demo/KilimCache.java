@@ -12,14 +12,17 @@ import kilim.Task;
 
 /**
  * a wrapper around the guava {@code LoadingCache} to allow fully async lookup.
- * the underlying cache is exposed
+ * the underlying cache is exposed, but the various getters should not be used.
+ * all lookup must be through this class, ie {@code get}.
+ * {@code register} must be called before the cache can be used
  * @param <KK> the key type
  * @param <VV> the value type
  */
 public class KilimCache<KK,VV> {
     public interface Reloadable<KK,VV> {
         /**
-         * Computes a (potentially replacement) value corresponding to a (potentially already-cached) key.
+         * Computes or fetches a (potentially replacement) value
+         * corresponding to a (potentially already-cached) key.
          * @param key the key
          * @param prev the previous value, either of type VV or {@code Relay}
          * @return the new value, or null to reuse the old value
@@ -29,10 +32,19 @@ public class KilimCache<KK,VV> {
 
     public Reloadable<KK,VV> reloader;
     public LoadingCache<KK,VV> guava;
-    
+
+    /**
+     * create a new cache - a reloader must be {@code register}ed before the cache can be used
+     * @param builder the builder to use to create the backing store
+     */    
     public KilimCache(CacheBuilder<KK,VV> builder) {
         guava = builder.build(new MyLoader());
     }
+    /**
+     * register a pausable reloader - must be called before the cache can be used
+     * @param reloader the reloader that computes or fetches values
+     * @return the cache
+     */
     public KilimCache<KK,VV> register(Reloadable<KK,VV> reloader) {
         this.reloader = reloader;
         return this;
@@ -50,8 +62,9 @@ public class KilimCache<KK,VV> {
             return Futures.immediateFuture(fork(key,prev));
         }
     }
+    /** a marker class used to represent a value that is not yet available */
     public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
-        public volatile VV dead;
+        private volatile VV dead;
     }
     private static void impossible(Throwable ex) {
         throw new RuntimeException("this should never happen",ex);
