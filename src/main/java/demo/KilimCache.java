@@ -67,20 +67,8 @@ public class KilimCache<KK,VV> {
 
         if (result==relay)
             return send(key,prev,relay);
-        else if (result instanceof Relay) {
-            Mailbox<VV> mb = new Mailbox();
-            Relay<VV> master = (Relay) result;
-            while (true) {
-                synchronized (master) {
-                    if (master.dead != null)
-                        return master.dead;
-                    if (master.putnb(mb))
-                        break;
-                }
-                Task.sleep(0);
-            }
-            return mb.get();
-        }
+        else if (result instanceof Relay)
+            return chain((Relay<VV>) result);
         else
             return result;
     }
@@ -94,5 +82,19 @@ public class KilimCache<KK,VV> {
         for (Mailbox<VV> mb; (mb = relay.get(0)) != null; )
             mb.put(val);
         return val;
+    }
+
+    private VV chain(Relay<VV> master) throws Pausable {
+        Mailbox<VV> mb = new Mailbox();
+        while (true) {
+            synchronized (master) {
+                if (master.dead != null)
+                    return master.dead;
+                if (master.putnb(mb))
+                    break;
+            }
+            Task.sleep(0);
+        }
+        return mb.get();
     }
 }
