@@ -32,9 +32,9 @@ public class GuavaCacheDemo {
                         .maximumSize(maxSize));
 
         loader.register(
-                (Integer key,Double prev) -> {
+                (Integer key,Object prev) -> {
                     if (key < maxNever & prev != null)
-                        return prev;
+                        return null;
                     Task.sleep(random.nextInt(maxDelay));
                     return key+random.nextDouble();
                 });

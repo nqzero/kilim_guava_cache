@@ -18,7 +18,13 @@ import kilim.Task;
  */
 public class KilimCache<KK,VV> {
     public interface Reloadable<KK,VV> {
-        VV body(KK key,VV prev) throws Pausable;
+        /**
+         * Computes a (potentially replacement) value corresponding to a (potentially already-cached) key.
+         * @param key the key
+         * @param prev the previous value, either of type VV or {@code Relay}
+         * @return the new value, or null to reuse the old value
+         */
+        VV reload(KK key,Object prev) throws Pausable;
     }
 
     public Reloadable<KK,VV> reloader;
@@ -33,16 +39,19 @@ public class KilimCache<KK,VV> {
     }
     private class MyLoader extends CacheLoader<KK,VV> {
         public VV load(KK key) throws Exception {
-            Relay<VV> relay = new Relay();
-            Task.fork(() -> send(key,null,relay));
-            return (VV) relay;
+            return (VV) fork(key,null);
         }
-        public ListenableFuture reload(Object key,Object prev) {
-            return Futures.immediateFuture(prev);
+        Relay<VV> fork(KK key,VV prev) {
+            Relay<VV> relay = new Relay();
+            Task.fork(() -> send(key,prev,relay));
+            return relay;
+        }
+        public ListenableFuture reload(KK key,VV prev) {
+            return Futures.immediateFuture(fork(key,prev));
         }
     }
     public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
-        public VV dead;
+        public volatile VV dead;
     }
     private static void impossible(Throwable ex) {
         throw new RuntimeException("this should never happen",ex);
@@ -74,8 +83,11 @@ public class KilimCache<KK,VV> {
     }
 
     private VV send(KK key,VV prev,Relay<VV> relay) throws Pausable {
-        VV val = reloader.body(key,prev);
-        guava.put(key,val);
+        VV val = reloader.reload(key,prev);
+        if (val==null)
+            val = prev instanceof Relay ? chain((Relay<VV>) prev):prev;
+        else
+            guava.put(key,val);
         synchronized (relay) {
             relay.dead = val;
         }
