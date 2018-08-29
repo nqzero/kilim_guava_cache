@@ -63,7 +63,8 @@ public class KilimCache<KK,VV> {
         }
     }
     /** a marker class used to represent a value that is not yet available */
-    public static class Relay<VV> extends Mailbox<Mailbox<VV>> {
+    public static class Relay<VV> {
+        private Mailbox<Mailbox<VV>> box = new Mailbox();
         private volatile VV dead;
     }
     private static void impossible(Throwable ex) {
@@ -104,7 +105,7 @@ public class KilimCache<KK,VV> {
         synchronized (relay) {
             relay.dead = val;
         }
-        for (Mailbox<VV> mb; (mb = relay.get(0)) != null; )
+        for (Mailbox<VV> mb; (mb = relay.box.get(0)) != null; )
             mb.put(val);
         return val;
     }
@@ -115,7 +116,7 @@ public class KilimCache<KK,VV> {
             synchronized (master) {
                 if (master.dead != null)
                     return master.dead;
-                if (master.putnb(mb))
+                if (master.box.putnb(mb))
                     break;
             }
             Task.sleep(0);
