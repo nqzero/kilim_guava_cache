@@ -1,4 +1,4 @@
-package demo;
+package kilim.guava;
 
 import com.google.common.cache.CacheBuilder;
 import kilim.Task;
